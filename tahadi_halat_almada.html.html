@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>تحدي حالات المادة</title>
+  <style>
+    :root{
+      --bg:#e6f7ff; --card:#dff6ff; --accent:#2b9edb; --ice:#bfefff; --dark:#054a6a;
+      --glass: rgba(255,255,255,0.6);
+    }
+    *{box-sizing:border-box;font-family: 'Tajawal', 'Noto Sans Arabic', Arial, sans-serif}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#f4fbff);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .container{width:100%;max-width:980px;background:linear-gradient(180deg,var(--card),#f0fbff);border-radius:16px;padding:18px;box-shadow:0 8px 30px rgba(2,40,60,0.12)}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    h1{margin:0;font-size:22px;color:var(--dark)}
+    .sub{color:#06668b;opacity:.9}
+
+    .layout{display:grid;grid-template-columns:360px 1fr;gap:16px}
+    .panel{background:var(--glass);padding:12px;border-radius:12px}
+
+    /* left */
+    .left .score{font-size:18px;margin-bottom:8px}
+    .players{display:flex;gap:8px;flex-direction:column}
+    input[type=text]{padding:8px;border-radius:8px;border:1px solid rgba(5,74,106,0.08);font-size:16px}
+    button{cursor:pointer;padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:600}
+    .muted{background:transparent;color:var(--dark);border:1px solid rgba(5,74,106,0.06)}
+
+    /* right */
+    .card{background:white;border-radius:12px;padding:16px;min-height:220px;box-shadow:0 6px 16px rgba(2,40,60,0.04)}
+    .question{font-size:20px;margin-bottom:12px;color:var(--dark)}
+    .options{display:flex;flex-direction:column;gap:10px}
+    .opt{padding:10px;border-radius:10px;border:1px solid rgba(5,74,106,0.06);background:linear-gradient(180deg,#f8feff,#f0fbff);cursor:pointer}
+    .opt.disabled{opacity:.6;pointer-events:none}
+    .timer{font-weight:700;margin-bottom:10px}
+
+    .result{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+    .leaderboard{margin-top:10px}
+    .leaderboard ol{padding-left:18px}
+
+    .small{font-size:13px;color:#065b80}
+
+    footer{margin-top:12px;text-align:center;color:#06668b}
+
+    @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>تحدي حالات المادة</h1>
+      <div class="sub">للمرحلة الابتدائية · طابع التحدي · مؤقت 15 ثانية</div>
+    </header>
+
+    <div class="layout">
+      <div class="left panel">
+        <div class="score">اسم اللاعب:</div>
+        <div class="players">
+          <input id="playerName" type="text" placeholder="اكتب اسم الطالبة أو الطالب" />
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="startBtn">ابدأ التحدي</button>
+            <button id="clearBoard" class="muted">مسح المراكز</button>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="panel small">
+          <strong>قابل للتعديل داخل الكود:</strong>
+          <ul>
+            <li>الأسئلة والأجوبة: جدولة سهلة من داخل المصفوفة <code>QUESTIONS</code>.</li>
+            <li>تغيير وقت السؤال: المتغير <code>TIMER_SECONDS</code>.</li>
+            <li>تغيير عنوان اللعبة من &quot;تحدي حالات المادة&quot;.</li>
+          </ul>
+        </div>
+
+        <div class="panel leaderboard">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <strong>المراكز الفائزة (الأعلى):</strong>
+            <small class="small">Top 3</small>
+          </div>
+          <ol id="boardList">
+            <!-- leaderboard entries -->
+          </ol>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="card">
+          <div class="timer">الوقت المتبقي: <span id="time">15</span> ث</div>
+          <div class="question" id="questionText">اضغط "ابدأ التحدي" لبدء اللعبة</div>
+          <div class="options" id="optionsBox"></div>
+
+          <div class="result" id="resultBox" style="display:none">
+            <div id="feedback"></div>
+            <div id="scoreBox"></div>
+          </div>
+
+          <div id="endBox" style="display:none;margin-top:12px;text-align:center">
+            <h3>انتهى التحدي!</h3>
+            <p id="finalText"></p>
+            <button id="playAgain">تشغيل لاعب آخر</button>
+          </div>
+        </div>
+
+        <footer>صُمِّمت لتشغيلها على متصفح الجهاز — يمكنك تعديل الأسئلة بكل سهولة.</footer>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /*********************
+     * EDITABLE SETTINGS *
+     *********************
+     * لتعديل الأسئلة: عدّلي المصفوفة QUESTIONS أدناه.
+     * كل عنصر يحتوي على: question (نص السؤال), options (مصفوفة خيارات), answer (فهرس الخيار الصحيح يبدأ من 0)
+     * مثال: { question: 'ما حالة الماء؟', options: ['صلبة','سائلة','غازية'], answer: 1 }
+     */
+
+    const TIMER_SECONDS = 15; // يمكنك تغيير وقت كل سؤال هنا
+
+    const QUESTIONS = [
+      {
+        question: 'ما هي ثلاث حالات المادة الأساسية؟',
+        options: ['صلبة - سائلة - غازية', 'طويلة - قصيرة - متوسطة', 'ساخنة - باردة - دافئة'],
+        answer: 0
+      },
+      {
+        question: 'أي حالة للمادة تحافظ على شكل ثابت؟',
+        options: ['الصلبة', 'السائلة', 'الغازية'],
+        answer: 0
+      },
+      {
+        question: 'ما اسم الحالة التي تأخذ شكل الوعاء وتحتفظ بكمية ثابتة؟',
+        options: ['الصلبة', 'السائلة', 'البلازما'],
+        answer: 1
+      },
+      {
+        question: 'في أي حالة للمادة تنتشر الجزيئات لتملأ الفراغ؟',
+        options: ['الغازية', 'الصلبة', 'السائلة'],
+        answer: 0
+      },
+      {
+        question: 'أي من التالي يحدث عندما نتجمد الماء؟',
+        options: ['يصبح ثلجًا (حالة صلبة)', 'يتبخر (حالة غازية)', 'يتحول إلى بخار الماء فورًا'],
+        answer: 0
+      }
+    ];
+
+    /*********************
+     * END EDITABLE AREA  *
+     *********************/
+
+    // --- Game state ---
+    let currentIndex = 0;
+    let remaining = TIMER_SECONDS;
+    let timerInterval = null;
+    let score = 0;
+    const playerInput = document.getElementById('playerName');
+
+    // DOM
+    const startBtn = document.getElementById('startBtn');
+    const clearBoardBtn = document.getElementById('clearBoard');
+    const questionText = document.getElementById('questionText');
+    const optionsBox = document.getElementById('optionsBox');
+    const timeEl = document.getElementById('time');
+    const feedback = document.getElementById('feedback');
+    const resultBox = document.getElementById('resultBox');
+    const scoreBox = document.getElementById('scoreBox');
+    const endBox = document.getElementById('endBox');
+    const finalText = document.getElementById('finalText');
+    const playAgain = document.getElementById('playAgain');
+    const boardList = document.getElementById('boardList');
+
+    // Leaderboard in localStorage
+    const STORAGE_KEY = 'tahadi_halat_al_mada_leaderboard_v1';
+
+    function loadLeaderboard(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      let arr = [];
+      try{ arr = raw ? JSON.parse(raw) : []; }catch(e){ arr = []; }
+      return arr;
+    }
+    function saveLeaderboard(arr){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    }
+    function renderLeaderboard(){
+      const arr = loadLeaderboard();
+      boardList.innerHTML = '';
+      const top = arr.sort((a,b)=>b.score-a.score).slice(0,3);
+      if(top.length===0){ boardList.innerHTML = '<li>لا يوجد بيانات بعد</li>'; return }
+      top.forEach(p=>{
+        const li = document.createElement('li');
+        li.textContent = `${p.name} — ${p.score} / ${QUESTIONS.length}`;
+        boardList.appendChild(li);
+      })
+    }
+
+    function startGame(){
+      const name = (playerInput.value || 'لاعب').trim();
+      if(!name){ alert('من فضلك اكتب اسم الطالبة أو الطالب'); playerInput.focus(); return }
+      startBtn.disabled = true;
+      playerInput.disabled = true;
+      currentIndex = 0; score = 0; remaining = TIMER_SECONDS;
+      endBox.style.display = 'none'; resultBox.style.display='none';
+      renderQuestion();
+      startTimer();
+    }
+
+    function renderQuestion(){
+      const q = QUESTIONS[currentIndex];
+      questionText.textContent = `السؤال ${currentIndex+1}: ${q.question}`;
+      optionsBox.innerHTML = '';
+      q.options.forEach((opt,idx)=>{
+        const btn = document.createElement('button');
+        btn.className = 'opt';
+        btn.innerText = opt;
+        btn.onclick = ()=> handleAnswer(idx);
+        optionsBox.appendChild(btn);
+      });
+      timeEl.textContent = remaining;
+    }
+
+    function startTimer(){
+      clearInterval(timerInterval);
+      remaining = TIMER_SECONDS; timeEl.textContent = remaining;
+      timerInterval = setInterval(()=>{
+        remaining--; timeEl.textContent = remaining;
+        if(remaining<=0) {
+          clearInterval(timerInterval);
+          // treat as wrong and move on
+          showFeedback(false, 'انتهى الوقت');
+          setTimeout(nextOrEnd,800);
+        }
+      },1000);
+    }
+
+    function handleAnswer(selected){
+      clearInterval(timerInterval);
+      const q = QUESTIONS[currentIndex];
+      const correct = (selected === q.answer);
+      if(correct) score += 1;
+      // disable options
+      Array.from(optionsBox.children).forEach(btn=> btn.classList.add('disabled'));
+      showFeedback(correct, correct? 'إجابة صحيحة!':'إجابة خاطئة');
+      setTimeout(nextOrEnd,900);
+    }
+
+    function showFeedback(correct, text){
+      resultBox.style.display = 'flex';
+      feedback.textContent = text;
+      scoreBox.textContent = `النتيجة الآن: ${score} / ${QUESTIONS.length}`;
+    }
+
+    function nextOrEnd(){
+      resultBox.style.display='none';
+      currentIndex++;
+      if(currentIndex < QUESTIONS.length){
+        remaining = TIMER_SECONDS;
+        renderQuestion();
+        startTimer();
+      }else{
+        endGame();
+      }
+    }
+
+    function endGame(){
+      clearInterval(timerInterval);
+      const name = (playerInput.value || 'لاعب').trim();
+      // save to leaderboard
+      const arr = loadLeaderboard();
+      arr.push({name, score});
+      saveLeaderboard(arr);
+      renderLeaderboard();
+      // show final
+      finalText.textContent = `${name} حصلت/حصل على ${score} من ${QUESTIONS.length}`;
+      endBox.style.display = 'block';
+      startBtn.disabled = false; playerInput.disabled = false;
+    }
+
+    // handlers
+    startBtn.addEventListener('click', startGame);
+    playAgain.addEventListener('click', ()=>{
+      playerInput.value = '';
+      endBox.style.display='none';
+      questionText.textContent = 'اضغط "ابدأ التحدي" لبدء اللعبة';
+      optionsBox.innerHTML = '';
+    });
+
+    clearBoardBtn.addEventListener('click', ()=>{
+      if(confirm('هل تريدين مسح جميع المراكز من القائمة؟')){
+        localStorage.removeItem(STORAGE_KEY);
+        renderLeaderboard();
+      }
+    })
+
+    // init
+    renderLeaderboard();
+
+  </script>
+</body>
+</html>
